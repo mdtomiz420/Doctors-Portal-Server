@@ -4,7 +4,7 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const getService = require('./Routes/service');
-const createUser = require('./Routes/createUser');
+
 const jwt = require('jsonwebtoken')
 require('dotenv').config()
 
@@ -45,7 +45,6 @@ async function run() {
 
   // put user Route 
 
-  createUser(userCollection, app)
 
   app.get('/available', async (req, res) => {
     const date = req.query.date
@@ -86,6 +85,21 @@ async function run() {
     res.send({ success: true, result })
   })
 
+
+  app.put('/user/:email', async (req, res) => {
+    const email = req.params.email;
+    const user = req.body;
+    const filter = { email: email };
+    const options = { upsert: true };
+    const updateDoc = {
+      $set: user
+    };
+    const result = await userCollection.updateOne(filter, updateDoc, options);
+    const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN)
+    res.send({ accessToken: token, result });
+  })
+
+
   app.get('/appointment', VerifyJwt, async (req, res) => {
     const email = req.query.email
     const decodedEmail = req.decoded.email
@@ -94,10 +108,10 @@ async function run() {
     if (decodedEmail === email) {
       const cursor = appointmentCollection.find(query)
       const result = await cursor.toArray();
-     return res.send(result)
+      return res.send(result)
     }
-    else{
-      return res.status(403).send({message : 'Forbidden Access'})
+    else {
+      return res.status(403).send({ message: 'Forbidden Access' })
     }
   })
   app.delete('/appointment/:id', async (req, res) => {
