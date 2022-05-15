@@ -77,10 +77,10 @@ async function run() {
     app.delete('/appointment/:id' , async (req , res) => {
       const id = req.params.id
       const result = await appointmentCollection.deleteOne( { "_id" : ObjectId(id) } );
-      console.log(result);
+      
       res.send({deleted : true})
     })
-    // 2118684145 2021
+ 
 }
 run().catch(console.dir)
 
