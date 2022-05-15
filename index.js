@@ -2,9 +2,13 @@
 const express = require('express');
 const cors = require('cors')
 const bodyParser = require('body-parser')
-const { MongoClient, ServerApiVersion , ObjectId } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const getService = require('./Routes/service');
+const createUser = require('./Routes/createUser');
+const jwt = require('jsonwebtoken')
 require('dotenv').config()
 
+var token = jwt.sign({ foo: 'bar' }, 'shhhhh');
 
 const app = express()
 app.use(cors())
@@ -14,82 +18,104 @@ const PORT = process.env.PORT || 5000
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.y7jek.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+const serviceCollection = client.db("doctors_portal").collection("services")
+const appointmentCollection = client.db("doctors_portal").collection("appointment")
+const userCollection = client.db("doctors_portal").collection("user")
 
+const VerifyJwt = (req, res, next) => {
+  const accessToken = req.headers.auth
+  if (!accessToken) {
+    return res.status(401).send({ message: 'UnAuthoraized' })
+  }
+
+  jwt.verify(accessToken, process.env.ACCESS_TOKEN, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: "Forbidden Access" })
+    }
+    req.decoded = decoded
+
+    next()
+  });
+}
 async function run() {
-    await client.connect()
-    console.log('Database Connected')
-    const serviceCollection = client.db("doctors_portal").collection("services")
-    const appointmentCollection = client.db("doctors_portal").collection("appointment")
+  await client.connect()
+  console.log('Database Connected')
 
-    app.get('/services' , async (req , res)=>{
-        const query = {};
-        const cursor = serviceCollection.find(query)
-        const services = await cursor.toArray();
-        res.send(services)
-    })
+  getService(serviceCollection, app) //get User Route
 
-    app.get('/available' , async (req , res) =>{
-      const date = req.query.date
-      // Get All data From Service collection
+  // put user Route 
 
-      const services = await serviceCollection.find().toArray()
+  createUser(userCollection, app)
 
-      // Get appointments of That Day
+  app.get('/available', async (req, res) => {
+    const date = req.query.date
+    // Get All data From Service collection
 
-      const query = {date : date}
+    const services = await serviceCollection.find().toArray()
 
-      const appointments = await appointmentCollection.find(query).toArray()
+    // Get appointments of That Day
 
-      // For Each Service
-      services.forEach((service) => {
-        const serviceAppointment = appointments.filter(appoint => appoint.treatment === service.name)
+    const query = { date: date }
 
-        const appointedSlots = serviceAppointment.map(app => app.slot)
+    const appointments = await appointmentCollection.find(query).toArray()
 
-        const available = service.slot.filter(slot1 => !appointedSlots.includes(slot1))
-        console.log(available);
-        service.slot = available
-      });
+    // For Each Service
+    services.forEach((service) => {
+      const serviceAppointment = appointments.filter(appoint => appoint.treatment === service.name)
 
-      res.send(services)
+      const appointedSlots = serviceAppointment.map(app => app.slot)
 
-    })
+      const available = service.slot.filter(slot1 => !appointedSlots.includes(slot1))
 
-    app.post('/appointment' , async (req, res)=>{
-      const ApData = req.body
-      const query = {date : ApData.date ,slot : ApData.slot , email : ApData.email }
-      const exists = await appointmentCollection.findOne(query)
-      if (exists) {
-        return res.send({ success: false, appointment: exists })
-      }
-      const result = await appointmentCollection.insertOne(ApData)
+      service.slot = available
+    });
 
-      res.send({success: true , result})
-    })
+    res.send(services)
 
-    app.get('/appointment' , async (req , res) =>{
-      const email = req.query.email
-      const query = {email : email};
+  })
+
+  app.post('/appointment', async (req, res) => {
+    const ApData = req.body
+    const query = { date: ApData.date, slot: ApData.slot, email: ApData.email }
+    const exists = await appointmentCollection.findOne(query)
+    if (exists) {
+      return res.send({ success: false, appointment: exists })
+    }
+    const result = await appointmentCollection.insertOne(ApData)
+
+    res.send({ success: true, result })
+  })
+
+  app.get('/appointment', VerifyJwt, async (req, res) => {
+    const email = req.query.email
+    const decodedEmail = req.decoded.email
+
+    const query = { email: email };
+    if (decodedEmail === email) {
       const cursor = appointmentCollection.find(query)
       const result = await cursor.toArray();
-      res.send(result)
-    })
-    app.delete('/appointment/:id' , async (req , res) => {
-      const id = req.params.id
-      const result = await appointmentCollection.deleteOne( { "_id" : ObjectId(id) } );
-      
-      res.send({deleted : true})
-    })
- 
+     return res.send(result)
+    }
+    else{
+      return res.status(403).send({message : 'Forbidden Access'})
+    }
+  })
+  app.delete('/appointment/:id', async (req, res) => {
+    const id = req.params.id
+    const result = await appointmentCollection.deleteOne({ "_id": ObjectId(id) });
+
+    res.send({ deleted: true })
+  })
+
 }
 run().catch(console.dir)
 
 
 
 app.get('/', (req, res) => {
-    res.send('Hello World!')
-  })
+  res.send('Hello World!')
+})
 
-  app.listen(PORT, () => {
-    console.log(`Example app listening on port ${PORT}`)
-  })
+app.listen(PORT, () => {
+  console.log(`Example app listening on port ${PORT}`)
+})
