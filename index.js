@@ -4,8 +4,9 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const getService = require('./Routes/service');
-
-const jwt = require('jsonwebtoken')
+const createUser = require('./Routes/createUser');
+const jwt = require('jsonwebtoken');
+const createAdmin = require('./Routes/admin');
 require('dotenv').config()
 
 var token = jwt.sign({ foo: 'bar' }, 'shhhhh');
@@ -21,6 +22,8 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 const serviceCollection = client.db("doctors_portal").collection("services")
 const appointmentCollection = client.db("doctors_portal").collection("appointment")
 const userCollection = client.db("doctors_portal").collection("user")
+
+const adminCollection = client.db("doctors_portal").collection("admin")
 
 const VerifyJwt = (req, res, next) => {
   const accessToken = req.headers.auth
@@ -44,7 +47,11 @@ async function run() {
   getService(serviceCollection, app) //get User Route
 
   // put user Route 
+  // create a user 
 
+  createUser(userCollection, app)
+  // createAdmin 
+  createAdmin(adminCollection, app)
 
   app.get('/available', async (req, res) => {
     const date = req.query.date
@@ -85,20 +92,24 @@ async function run() {
     res.send({ success: true, result })
   })
 
-
-  app.put('/user/:email', async (req, res) => {
-    const email = req.params.email;
-    const user = req.body;
-    const filter = { email: email };
-    const options = { upsert: true };
-    const updateDoc = {
-      $set: user
-    };
-    const result = await userCollection.updateOne(filter, updateDoc, options);
-    const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN)
-    res.send({ accessToken: token, result });
+  // get Admins 
+  // get Admins 
+  // get Adm  ins 
+  app.get('/admins', async (req, res) => {
+    // const email = req.query.email
+    // const decodedEmail = req.decoded.email
+    const cursor = adminCollection.find()
+    const result = await cursor.toArray()
+    res.send(result)
+    // if (decodedEmail === email) {
+    //   const cursor = adminCollection.find()
+    //   const result = await cursor.toArray();
+    //   return res.send(result)
+    // }
+    // else {
+    //   return res.status(403).send({ message: 'Forbidden Access' })
+    // }
   })
-
 
   app.get('/appointment', VerifyJwt, async (req, res) => {
     const email = req.query.email
@@ -114,6 +125,23 @@ async function run() {
       return res.status(403).send({ message: 'Forbidden Access' })
     }
   })
+  // Get All Apointment 
+  // Get All Apointment 
+  app.get('/all-appointment', VerifyJwt, async (req, res) => {
+    const email = req.query.email
+    const decodedEmail = req.decoded.email
+
+    
+    if (decodedEmail === email) {
+      const cursor = appointmentCollection.find({})
+      const result = await cursor.toArray();
+      return res.send(result)
+    }
+    else {
+      return res.status(403).send({ message: 'Forbidden Access' })
+    }
+  })
+
   app.delete('/appointment/:id', async (req, res) => {
     const id = req.params.id
     const result = await appointmentCollection.deleteOne({ "_id": ObjectId(id) });
@@ -121,6 +149,41 @@ async function run() {
     res.send({ deleted: true })
   })
 
+
+  app.get('/user', VerifyJwt, async (req, res) => {
+    const user = await userCollection.find().toArray()
+    res.send(user)
+  })
+
+  app.put('/user/admin/:email', VerifyJwt, async (req, res) => {
+    const email = req.params.email;
+    const requester = req.decoded.email;
+    const requesterAccount = await userCollection.findOne({ email: requester });
+    const arg = req.body
+
+    if (requesterAccount.role === 'admin') {
+      const filter = { email: email };
+      const updateDoc = {
+        $set: arg
+      };
+      const result = await userCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    }
+    else {
+      res.status(403).send({ message: 'forbidden' });
+    }
+
+  })
+  // getCurrentuser 
+
+  app.get('/currentuser', VerifyJwt, async (req, res) => {
+    const email = req.query.email
+    // console.log(email)
+    const query = { email: email };
+    const cursor = userCollection.find(query)
+    const result = await cursor.toArray()
+    res.send(result)
+  })
 }
 run().catch(console.dir)
 
