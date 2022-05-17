@@ -8,8 +8,9 @@ const createUser = require('./Routes/createUser');
 const jwt = require('jsonwebtoken');
 const createAdmin = require('./Routes/admin');
 require('dotenv').config()
+const nodemailer = require("nodemailer");
 
-var token = jwt.sign({ foo: 'bar' }, 'shhhhh');
+const token = jwt.sign({ foo: 'bar' }, 'shhhhh');
 
 const app = express()
 app.use(cors())
@@ -82,20 +83,20 @@ async function run() {
   })
   // API For Post a Doctor 
 
-  app.post('/doctor' , async (req , res)=>{
+  app.post('/doctor', async (req, res) => {
     const data = req.body
     const result = await doctorsCollection.insertOne(data)
     res.send(result)
   })
 
-    // API For get all doctor 
-    app.get('/doctor' ,async(req , res) =>{
-      const result = await doctorsCollection.find().toArray()
-      res.send(result)
-    })
+  // API For get all doctor 
+  app.get('/doctor', async (req, res) => {
+    const result = await doctorsCollection.find().toArray()
+    res.send(result)
+  })
 
 
-  app.post('/appointment', async (req, res) => {
+  app.post('/apointment', async (req, res) => {
     const ApData = req.body
     const query = { date: ApData.date, slot: ApData.slot, email: ApData.email }
     const exists = await appointmentCollection.findOne(query)
@@ -103,6 +104,41 @@ async function run() {
       return res.send({ success: false, appointment: exists })
     }
     const result = await appointmentCollection.insertOne(ApData)
+
+    async function main() {
+
+      const transporter = nodemailer.createTransport({
+      service : 'gmail' ,
+        auth: {
+          user: 'mdtomiz.official@gmail.com', 
+          pass: process.env.NODEMAILER_PASS,
+        },
+      });
+
+      // send mail with defined transport object
+      const info = await transporter.sendMail({
+        from: 'mdtomiz.official@gmail.com',
+        to: ApData.email,
+        subject: "Doctors Portal ✔", 
+        text: "Doctors Portal ✔",
+        html: `
+        <div>
+        <h3>Hello ${ApData.email}</h3>
+        <h5>Your Appointment Confirmed</h5>
+        <h4>Treatment Name : ${ApData.treatment}</h5>
+        <h5>Date : ${ApData.date}</h5>
+        <h5>Time : ${ApData.slot}</h5>
+        </div>
+        `,
+      });
+
+      console.log("Message sent: %s", info.messageId);
+
+      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+
+    }
+
+    main().catch(console.error);
 
     res.send({ success: true, result })
   })
@@ -156,9 +192,9 @@ async function run() {
       return res.status(403).send({ message: 'Forbidden Access' })
     }
   })
-  app.get('/appointment-one' ,VerifyJwt, async (req , res) => {
+  app.get('/appointment-one', VerifyJwt, async (req, res) => {
     const email = req.query.email
-    const query = {email : email}
+    const query = { email: email }
     const cursor = appointmentCollection.find(query)
     const result = await cursor.toArray()
     res.send(result)
