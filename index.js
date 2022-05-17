@@ -24,6 +24,7 @@ const appointmentCollection = client.db("doctors_portal").collection("appointmen
 const userCollection = client.db("doctors_portal").collection("user")
 
 const adminCollection = client.db("doctors_portal").collection("admin")
+const doctorsCollection = client.db("doctors_portal").collection("doctor")
 
 const VerifyJwt = (req, res, next) => {
   const accessToken = req.headers.auth
@@ -79,6 +80,20 @@ async function run() {
     res.send(services)
 
   })
+  // API For Post a Doctor 
+
+  app.post('/doctor' , async (req , res)=>{
+    const data = req.body
+    const result = await doctorsCollection.insertOne(data)
+    res.send(result)
+  })
+
+    // API For get all doctor 
+    app.get('/doctor' ,async(req , res) =>{
+      const result = await doctorsCollection.find().toArray()
+      res.send(result)
+    })
+
 
   app.post('/appointment', async (req, res) => {
     const ApData = req.body
@@ -131,7 +146,7 @@ async function run() {
     const email = req.query.email
     const decodedEmail = req.decoded.email
 
-    
+
     if (decodedEmail === email) {
       const cursor = appointmentCollection.find({})
       const result = await cursor.toArray();
@@ -140,6 +155,13 @@ async function run() {
     else {
       return res.status(403).send({ message: 'Forbidden Access' })
     }
+  })
+  app.get('/appointment-one' ,VerifyJwt, async (req , res) => {
+    const email = req.query.email
+    const query = {email : email}
+    const cursor = appointmentCollection.find(query)
+    const result = await cursor.toArray()
+    res.send(result)
   })
 
   app.delete('/appointment/:id', async (req, res) => {
