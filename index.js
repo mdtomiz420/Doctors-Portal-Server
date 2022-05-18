@@ -172,11 +172,11 @@ async function run() {
     const id = req.params.id
     const result = await appointmentCollection.deleteOne({ "_id": ObjectId(id) });
 
-    res.send({ deleted: true })
+    res.send(result)
   })
   // API for create users 
   // API for create users 
-  app.put('/user/:email', verifyJWT, async (req, res) => {
+  app.put('/user/:email', async (req, res) => {
     const email = req.params.email;
     const user = req.body;
     const filter = { email: email };
@@ -186,6 +186,7 @@ async function run() {
     };
     const result = await userCollection.updateOne(filter, updateDoc, options);
     const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN)
+
     res.send({ accessToken: token, result });
   })
 
