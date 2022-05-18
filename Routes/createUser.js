@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken')
 require('dotenv').config()
 
-function createUser(collection , app ) {
-    app.put('/user/:email' ,async (req, res) => {
+function createUser(collection , app  , verifyJWT) {
+    app.put('/user/:email', verifyJWT ,async (req, res) => {
         const email = req.params.email ;
         const user = req.body;
         const filter = {email: email};

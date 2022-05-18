@@ -1,4 +1,4 @@
-
+const nodemailer = require("nodemailer");
 const express = require('express');
 const cors = require('cors')
 const bodyParser = require('body-parser')
@@ -7,10 +7,10 @@ const getService = require('./Routes/service');
 const createUser = require('./Routes/createUser');
 const jwt = require('jsonwebtoken');
 const createAdmin = require('./Routes/admin');
-require('dotenv').config()
-const nodemailer = require("nodemailer");
+const sendMailFormContact = require("./Routes/contactMail");
 
-const token = jwt.sign({ foo: 'bar' }, 'shhhhh');
+require('dotenv').config()
+
 
 const app = express()
 app.use(cors())
@@ -20,81 +20,101 @@ const PORT = process.env.PORT || 5000
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.y7jek.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+// All Collections 
 const serviceCollection = client.db("doctors_portal").collection("services")
 const appointmentCollection = client.db("doctors_portal").collection("appointment")
 const userCollection = client.db("doctors_portal").collection("user")
-
-const adminCollection = client.db("doctors_portal").collection("admin")
 const doctorsCollection = client.db("doctors_portal").collection("doctor")
+const messageCollection = client.db("doctors_portal").collection("message")
 
-const VerifyJwt = (req, res, next) => {
+const verifyJWT = (req, res, next) => {
   const accessToken = req.headers.auth
   if (!accessToken) {
     return res.status(401).send({ message: 'UnAuthoraized' })
   }
-
   jwt.verify(accessToken, process.env.ACCESS_TOKEN, function (err, decoded) {
     if (err) {
       return res.status(403).send({ message: "Forbidden Access" })
     }
     req.decoded = decoded
-
     next()
   });
 }
+// function for send mail with nodemailer 
+// function for send mail with nodemailer 
+
+const sendEmail = (senderData) => {
+  async function main() {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'mdtomiz.official@gmail.com',
+        pass: process.env.NODEMAILER_PASS,
+      },
+    });
+    // send mail with defined transport object
+    const info = await transporter.sendMail({
+      from: 'mdtomiz.official@gmail.com',
+      to: senderData.email,
+      subject: "Doctors Portal ✔",
+      text: "Doctors Portal ✔",
+      html: `
+          </div>
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+            <h4 style="color: rgb(0, 1, 65);">Hello ${senderData.email}</h4>
+            <p>Thank you for requesting an appointment !!</p>
+            <h4 style="color: green;">You Appointment Recived Successfully</h4>
+            <h4>Treatment Name : ${senderData.treatment}</h4>
+            <h4>Date : ${senderData.date}</h4>
+            <h4>Time : ${senderData.slot}</h4>
+            <p>Please Pay For Confirm Your Appointment.</p>
+            <a href='https://doctors-portal-4.netlify.app/dashboard' style="padding: 5px 10px;">Pay</a>
+          </div>
+          `,
+    });
+
+    console.log("Message sent: %s", info.messageId);
+    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+  }
+
+  main().catch(console.error);
+}
+// End Nodemailer 
+// End Nodemailer 
 async function run() {
   await client.connect()
   console.log('Database Connected')
-
   getService(serviceCollection, app) //get User Route
 
-  // put user Route 
-  // create a user 
 
-  createUser(userCollection, app)
-  // createAdmin 
-  createAdmin(adminCollection, app)
-
+  // Api for get availavle services 
+  // Api for get availavle services 
   app.get('/available', async (req, res) => {
     const date = req.query.date
-    // Get All data From Service collection
-
     const services = await serviceCollection.find().toArray()
-
-    // Get appointments of That Day
-
     const query = { date: date }
-
     const appointments = await appointmentCollection.find(query).toArray()
-
-    // For Each Service
     services.forEach((service) => {
       const serviceAppointment = appointments.filter(appoint => appoint.treatment === service.name)
-
       const appointedSlots = serviceAppointment.map(app => app.slot)
-
       const available = service.slot.filter(slot1 => !appointedSlots.includes(slot1))
-
       service.slot = available
     });
-
     res.send(services)
-
   })
-  // API For Post a Doctor 
-
+  // Api for post doctors 
+  // Api for post doctors 
   app.post('/doctor', async (req, res) => {
     const data = req.body
     const result = await doctorsCollection.insertOne(data)
     res.send(result)
   })
-
+  // API For get all doctor 
   // API For get all doctor 
   app.get('/doctor', async (req, res) => {
     const result = await doctorsCollection.find().toArray()
     res.send(result)
   })
-
 
   app.post('/apointment', async (req, res) => {
     const ApData = req.body
@@ -104,68 +124,13 @@ async function run() {
       return res.send({ success: false, appointment: exists })
     }
     const result = await appointmentCollection.insertOne(ApData)
-
-    async function main() {
-
-      const transporter = nodemailer.createTransport({
-      service : 'gmail' ,
-        auth: {
-          user: 'mdtomiz.official@gmail.com', 
-          pass: process.env.NODEMAILER_PASS,
-        },
-      });
-
-      // send mail with defined transport object
-      const info = await transporter.sendMail({
-        from: 'mdtomiz.official@gmail.com',
-        to: ApData.email,
-        subject: "Doctors Portal ✔", 
-        text: "Doctors Portal ✔",
-        html: `
-        <div>
-        <h3>Hello ${ApData.email}</h3>
-        <h5>Your Appointment Confirmed</h5>
-        <h4>Treatment Name : ${ApData.treatment}</h5>
-        <h5>Date : ${ApData.date}</h5>
-        <h5>Time : ${ApData.slot}</h5>
-        </div>
-        `,
-      });
-
-      console.log("Message sent: %s", info.messageId);
-
-      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-
-    }
-
-    main().catch(console.error);
-
+    sendEmail(ApData)
     res.send({ success: true, result })
   })
 
-  // get Admins 
-  // get Admins 
-  // get Adm  ins 
-  app.get('/admins', async (req, res) => {
-    // const email = req.query.email
-    // const decodedEmail = req.decoded.email
-    const cursor = adminCollection.find()
-    const result = await cursor.toArray()
-    res.send(result)
-    // if (decodedEmail === email) {
-    //   const cursor = adminCollection.find()
-    //   const result = await cursor.toArray();
-    //   return res.send(result)
-    // }
-    // else {
-    //   return res.status(403).send({ message: 'Forbidden Access' })
-    // }
-  })
-
-  app.get('/appointment', VerifyJwt, async (req, res) => {
+  app.get('/appointment', verifyJWT, async (req, res) => {
     const email = req.query.email
     const decodedEmail = req.decoded.email
-
     const query = { email: email };
     if (decodedEmail === email) {
       const cursor = appointmentCollection.find(query)
@@ -178,11 +143,9 @@ async function run() {
   })
   // Get All Apointment 
   // Get All Apointment 
-  app.get('/all-appointment', VerifyJwt, async (req, res) => {
+  app.get('/all-appointment', verifyJWT, async (req, res) => {
     const email = req.query.email
     const decodedEmail = req.decoded.email
-
-
     if (decodedEmail === email) {
       const cursor = appointmentCollection.find({})
       const result = await cursor.toArray();
@@ -192,7 +155,7 @@ async function run() {
       return res.status(403).send({ message: 'Forbidden Access' })
     }
   })
-  app.get('/appointment-one', VerifyJwt, async (req, res) => {
+  app.get('/appointment-one', verifyJWT, async (req, res) => {
     const email = req.query.email
     const query = { email: email }
     const cursor = appointmentCollection.find(query)
@@ -206,14 +169,27 @@ async function run() {
 
     res.send({ deleted: true })
   })
+  // API for create users 
+  // API for create users 
+  app.put('/user/:email', verifyJWT, async (req, res) => {
+    const email = req.params.email;
+    const user = req.body;
+    const filter = { email: email };
+    const options = { upsert: true };
+    const updateDoc = {
+      $set: user
+    };
+    const result = await userCollection.updateOne(filter, updateDoc, options);
+    const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN)
+    res.send({ accessToken: token, result });
+  })
 
-
-  app.get('/user', VerifyJwt, async (req, res) => {
+  app.get('/user', verifyJWT, async (req, res) => {
     const user = await userCollection.find().toArray()
     res.send(user)
   })
 
-  app.put('/user/admin/:email', VerifyJwt, async (req, res) => {
+  app.put('/user/admin/:email', verifyJWT, async (req, res) => {
     const email = req.params.email;
     const requester = req.decoded.email;
     const requesterAccount = await userCollection.findOne({ email: requester });
@@ -234,18 +210,39 @@ async function run() {
   })
   // getCurrentuser 
 
-  app.get('/currentuser', VerifyJwt, async (req, res) => {
+  app.get('/currentuser', verifyJWT, async (req, res) => {
     const email = req.query.email
-    // console.log(email)
     const query = { email: email };
     const cursor = userCollection.find(query)
     const result = await cursor.toArray()
     res.send(result)
   })
+
+  // get Message For current user 
+  app.get('/messages', verifyJWT, async (req, res) => {
+    const email = req.query.email
+    const query = { email: email };
+    const cursor = messageCollection.find(query)
+    const result = await cursor.toArray()
+    res.send(result)
+  })
+  // get Message For Admin
+  app.get('/messages-all', verifyJWT, async (req, res) => {
+    const cursor = messageCollection.find()
+    const result = await cursor.toArray()
+    res.send(result)
+  })
+  app.delete('/messages/:id', verifyJWT, async (req, res) => {
+    const id = req.params.id
+    const query = { "_id": ObjectId(id)}
+    const result = await messageCollection.deleteOne(query);
+    res.send(result)
+  })
+
 }
 run().catch(console.dir)
 
-
+sendMailFormContact(app, messageCollection)
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
