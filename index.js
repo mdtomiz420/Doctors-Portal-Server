@@ -111,11 +111,16 @@ async function run() {
   })
   // API For get all doctor 
   // API For get all doctor 
-  app.get('/doctor', async (req, res) => {
-    const result = await doctorsCollection.find().toArray()
+  app.get('/doctors', async (req, res) => {
+    const cursor = doctorsCollection.find()
+    const result = await cursor.toArray()
     res.send(result)
   })
-
+  app.delete('/doctor/:id' ,async (req , res) => {
+    const id = req.params.id
+    const result = await doctorsCollection.deleteOne({ "_id": ObjectId(id) });
+    res.send(result)
+  })
   app.post('/apointment', async (req, res) => {
     const ApData = req.body
     const query = { date: ApData.date, slot: ApData.slot, email: ApData.email }
@@ -234,7 +239,7 @@ async function run() {
   })
   app.delete('/messages/:id', verifyJWT, async (req, res) => {
     const id = req.params.id
-    const query = { "_id": ObjectId(id)}
+    const query = { "_id": ObjectId(id) }
     const result = await messageCollection.deleteOne(query);
     res.send(result)
   })
